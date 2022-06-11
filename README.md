@@ -20,6 +20,8 @@ Note that will not be covered in this tutorial (but I will cover later) are:
 + Custom authorization schemes in Django
 + Building a custom REST API authentication backend in Django
 
+**If you want to skip all the details, there is also a TL;DR section at the end of the tutorial.**
+
 ## Starting the application
 
 ### Poetry
@@ -195,3 +197,126 @@ reasons:
 
 1. We have not yet migrated our database, so have no User table
 2. Even if we had migrated our database, we have not created any User records.
+
+Let's correct the first problem now. First, stop the server and then run the
+following command to migrate the database:
+
+```sh
+python manage.py migrate
+```
+
+> **Huh?** You may be wondering at this stage where the definition of our User table comes
+from. It comes from the `django.contrib.auth` app which is by default in the
+`INSTALLED_APPS` in `settings.py`
+
+Rerun the server, and try to login with any details. You should see a little
+message reading: `Please enter a correct username and password. ...`
+
+## Writing a Custom Authentication Backend
+
+Let's now assume that we want to always allow access to the site with a
+hard-coded user with the credentials:
+
++ Username: `let_me_in`
++ Password: `please`
+
+Of course you would never want to do this, but it does illustrate how to create
+the custom Django authentication backend.
+
+First, let's create a new folder in our `./in_memory_authentication` folder
+called `backends`. Like any Python module, it will need a `__init__.py` file,
+so create that, and go ahead and create a file for the actual backend. I
+called mine `./in_memory_authentication/backends/in_memory_authentication_backend.py`.
+
+Let's populate this file now with the following:
+
+```py
+# ./in_memory_authentication/backends/in_memory_authentication_backend.py
+
+from django.contrib.auth.backends import BaseBackend
+
+
+class InMemoryAuthenticationBackend(BaseBackend):
+    def authenticate(self, request, username=None, password=None):
+        return None
+```
+
+You will notice that I'm extending the `BaseBackend` auth backend. It has a
+single function `authenticate` that takes in the request, as well as `username`
+and `password`. The function should respond in the following way:
+
++ Should return `None` if the authentication attempt fails
++ Should return an instance of the User model if the authentication attempt succeeds
+
+Let's export this in the newly-created `__init__.py` file:
+
+```py
+# ./in_memory_authentication/backends/__init__.py
+
+from .in_memory_authentication_backend import InMemoryAuthenticationBackend
+```
+
+Let's also "register" this backend with our Django app. Open up the `settings.py`
+file and make the following two changes:
+
+```py
+INSTALLED_APPS = [
+    # ... other apps
+    "django.contrib.auth",
+    # ... other apps
+    "in_memory_authentication",  # Install our new app here
+]
+
+# ...
+
+# Add this to the bottom of the file:
+
+AUTHENTICATION_BACKENDS = [
+    "in_memory_authentication.backends.InMemoryAuthenticationBackend",
+]
+```
+
+Now if we attempt to login, our custom authentication backend will be called. Of
+course, we still won't be able to login since we are always returning `None` from
+our `authenticate` method.
+
+Let's change that now.
+
+Open up `./in_memory_authentication/backends/in_memory_authentication_backend.py` and
+alter it to:
+
+```py
+# ./in_memory_authentication/backends/in_memory_authentication_backend.py
+import uuid
+
+from django.contrib.auth.backends import BaseBackend
+from django.contrib.auth.models import User
+
+
+class InMemoryAuthenticationBackend(BaseBackend):
+    def authenticate(self, request, username=None, password=None):
+        # Replace this silly logic with whatever you need:
+        if username == "let_me_in" and password == "please":
+
+            # Create a new user
+            new_user = User(username=uuid.uuid4().__str__())
+            new_user.set_unusable_password()
+            new_user.save()
+
+            return new_user
+        else:
+            return None
+```
+
+This is some silly logic, and you should replace it with what you need, but
+it creates a new User and returns that user, thus logging them in. You should
+replace this with things like a call to a Dex or Keycloak API, for example.
+
+If you now login with the credentials `let_me_in` and `please`, you should
+successfully authenticate.
+
+Of course, we have not built any pages after the user logs in, so you should get
+a `404 Page not found` error at this stage.
+
+That's it! We've successfully created and used our own custom authentication
+backend in Django.
