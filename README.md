@@ -1,5 +1,49 @@
 # How to Create a Custom Authentication Backend in Django
 
+This tutorial shows you how to create a custom authentication backend in Django.
+I've included a TL;DR right up front if you already know a bit about Django.
+
+## TL;DR - Just Gimme the Answer
+
+### settings.py
+
+```py
+# ./mysite/settings.py
+
+INSTALLED_APPS = [
+    # ... other apps
+    "django.contrib.auth",
+    # ... other apps
+    "my_custom_authentication",  # Or whatever your app is called
+]
+
+# ...
+
+AUTHENTICATION_BACKENDS = [
+    "my_custom_authentication.backends.MyCustomAuthenticationBackend",
+]
+```
+
+### my_custom_authentication_backend.py
+
+```py
+# ./my_custom_authentication/backends/my_custom_authentication_backend.py
+from django.contrib.auth.backends import BaseBackend
+from django.contrib.auth import get_user_model
+
+
+class InMemoryAuthenticationBackend(BaseBackend):
+    def authenticate(self, request, username=None, password=None):
+        return self.find_user(username, password)
+
+    def find_user(self, username, password):
+        user = # ... some custom logic such as an API call to an identity provider
+
+        return user or None
+```
+
+If the above doesn't make much sense, follow the complete tutorial below:
+
 ## Introduction
 
 Django comes with built-in authentication backends that make it really easy to
@@ -19,8 +63,6 @@ Note that will not be covered in this tutorial (but I will cover later) are:
 
 + Custom authorization schemes in Django
 + Building a custom REST API authentication backend in Django
-
-**If you want to skip all the details, there is also a TL;DR section at the end of the tutorial.**
 
 ## Starting the application
 
@@ -317,6 +359,36 @@ successfully authenticate.
 
 Of course, we have not built any pages after the user logs in, so you should get
 a `404 Page not found` error at this stage.
+
+You'll notice I am returning an instance of the `django.contrib.auth.models.User`
+class. However, not all Django projects will use this, and it is therefore
+better to make use of the `get_user_model()` function to find what class this
+project uses.  Further, we can extract the finding of the user into a method:
+
+```py
+# ./in_memory_authentication/backends/in_memory_authentication_backend.py
+import uuid
+
+from django.contrib.auth.backends import BaseBackend
+from django.contrib.auth import get_user_model
+
+
+class InMemoryAuthenticationBackend(BaseBackend):
+    def authenticate(self, request, username=None, password=None):
+        return self.find_user(username, password)
+
+    # Replace this silly logic with something better, such as an API call to
+    # an identity provider:
+    def find_user(self, username, password):
+        if username == "let_me_in" and password == "please":
+            user_klass = get_user_model()
+            new_user = user_klass(username=uuid.uuid4().__str__())
+            new_user.set_unusable_password()
+            new_user.save()
+            return new_user
+        else:
+            return None
+```
 
 That's it! We've successfully created and used our own custom authentication
 backend in Django.

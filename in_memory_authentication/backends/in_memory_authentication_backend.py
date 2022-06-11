@@ -2,19 +2,21 @@
 import uuid
 
 from django.contrib.auth.backends import BaseBackend
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 
 
 class InMemoryAuthenticationBackend(BaseBackend):
     def authenticate(self, request, username=None, password=None):
-        # Replace this silly logic with whatever you need:
-        if username == "let_me_in" and password == "please":
+        return self.find_user(username, password)
 
-            # Create a new user
-            new_user = User(username=uuid.uuid4().__str__())
+    # Replace this silly logic with something better, such as an API call to
+    # an identity provider:
+    def find_user(self, username, password):
+        if username == "let_me_in" and password == "please":
+            user_klass = get_user_model()
+            new_user = user_klass(username=uuid.uuid4().__str__())
             new_user.set_unusable_password()
             new_user.save()
-
             return new_user
         else:
             return None
