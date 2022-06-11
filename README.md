@@ -1,14 +1,13 @@
-# How to create a custom authentication backend in Django
+# How to Create a Custom Authentication Backend in Django
 
 ## Introduction
 
-Django comes with
-[built-in authentication backends](https://docs.djangoproject.com/en/4.0/topics/auth/)
-that make it really easy to get started and meet most projects' needs. There are
-also a slew of Django apps (such as [django-allauth](https://django-allauth.readthedocs.io/))
-that have been written to integrate your Django application with identity
-providers such as Google and GitHub. But when even these don't meet your
-project's requirements, there is the option of creating your own custom
+Django comes with built-in authentication backends that make it really easy to
+get started and meet most projects' needs. There are also a slew of Django apps
+(such as [django-allauth](https://django-allauth.readthedocs.io/)) that have
+been written to integrate your Django application with identity providers such
+as Google and GitHub. But when even these don't meet your project's
+requirements, there is the option of creating your own custom
 authentication backend. This sounds like a complicated thing to do, but is
 actually really simple.
 
@@ -101,3 +100,98 @@ Navigate to the URL shown (usually `http://localhost:8000`) and you should see
 a lovely rocket blasting off:
 
 ![rocket_ship.png](images/rocket_ship.png)
+
+## Understanding Django's Default User Authentication
+
+If don't know already and you're interested how Django would do normal User
+authentication, check out
+[this great tutorial](https://learndjango.com/tutorials/django-login-and-logout-tutorial).
+Because it's already covered so well there, I won't cover it here, and rather
+just proceed to customizing our user authentication.
+
+## Implementing a Login Page
+
+The first thing we'd need to do is include a login page for our Users to
+authenticate. Go ahead and open the `./mysite/urls.py` file.  Add the following
+marked line to it:
+
+```py
+from django.urls import path, include  # Added "include" here
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path("accounts/", include("django.contrib.auth.urls")),  # Added this line
+]
+```
+
+What this does is mount the default Views provided in the `django.contrib.auth`
+app to a URL of our choice (in this case `accounts/`).
+
+Let's run the server again (`python manage.py runserver`) and this time navigate
+to <http://localhost:8000/accounts/login>.  Oops! You should get an error page
+saying:
+
+```txt
+TemplateDoesNotExist at /accounts/login/
+```
+
+That's because we need to define an HTML Template for the login page.  Do this
+by creating the following folders in the root folder (i.e. NOT the `mysite` nor
+`in_memory_authentication` folder)
+
+```sh
+mkdir templates
+mkdir templates/registration
+```
+
+Then create a `login.html` file in the `templates/registration` folder
+with the following content:
+
+```html
+<h2>Log In</h2>
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button type="submit">Log In</button>
+</form>
+```
+
+One final thing we need to do is configure our Django project to look for
+templates in this folder structure. Open up the `settings.py` again, and look
+for the `TEMPLATES` constant:
+
+```py
+TEMPLATES = [
+    {
+        # ...
+        'DIRS': [],
+        # ...
+    },
+]
+```
+
+Change the `DIRS` value from an empty list to:
+
+```py
+TEMPLATES = [
+    {
+        # ...
+        'DIRS': [BASE_DIR / "templates"],
+        # ...
+    },
+]
+```
+
+This instructs our Django project to look for templates in folders called
+`templates`.
+
+Restart the server and navigate to <http://localhost:8000/accounts/login> again.
+You should see a beautiful login form:
+
+![login.png](images/login.png)
+
+Attempting to login with details will not work, obviously, for a number of
+reasons:
+
+1. We have not yet migrated our database, so have no User table
+2. Even if we had migrated our database, we have not created any User records.
